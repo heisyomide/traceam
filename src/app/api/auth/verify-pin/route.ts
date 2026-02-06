@@ -26,22 +26,21 @@ export async function POST(req: Request) {
       );
     }
 
- // 3. GENERATE REAL JWT 🛰️
-const secret = process.env.JWT_SECRET;
+    // 3. GENERATE REAL JWT
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("CRITICAL: JWT_SECRET is not defined.");
+      return NextResponse.json(
+        { success: false, error: "SERVER_CONFIGURATION_ERROR" },
+        { status: 500 }
+      );
+    }
 
-if (!secret) {
-  console.error("CRITICAL: JWT_SECRET is not defined in environment variables.");
-  return NextResponse.json(
-    { success: false, error: "SERVER_CONFIGURATION_ERROR" },
-    { status: 500 }
-  );
-}
-
-const token = jwt.sign(
-  { id: user._id, email: user.email },
-  secret,
-  { expiresIn: "24h" }
-);
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      secret,
+      { expiresIn: "24h" }
+    );
 
     // 4. PREPARE SECURE RESPONSE
     const response = NextResponse.json({ 
@@ -53,24 +52,34 @@ const token = jwt.sign(
       }
     }, { status: 200 });
 
-// 5. SET THE COOKIE 🛡️
-response.cookies.set("auth-token", token, {
-  httpOnly: true, // Remains true to block client-side script access
-  
-  // Vercel handles HTTPS automatically. 
-  // This ensures the cookie is ONLY sent over encrypted connections.
-  secure: true, 
-  
-  // 'strict' is safer for banking/security apps, 
-  // but 'lax' is better if you have external links pointing to the dashboard.
-  sameSite: "lax", 
-  
-  maxAge: 60 * 60 * 24, // 24 hours
-  path: "/",
-  domain: "traceam.vercel.app",
-  // If you have a custom domain (e.g., app.traceam.com), 
-  // you can specify it here, but leaving it out works for .vercel.app
-});
+    // 5. SET THE SECURE AUTH COOKIE (Hidden from JS) 🛡️
+    response.cookies.set("auth-token", token, {
+      httpOnly: true, 
+      secure: true, 
+      sameSite: "lax", 
+      maxAge: 60 * 60 * 24,
+      path: "/",
+      // REMOVED domain property for better Vercel compatibility
+    });
+
+    // 6. SET THE PUBLIC LOGGED-IN COOKIE (Visible to Navbar) 🛰️
+    // This allows the Navbar to see that a session is active
+    response.cookies.set("is-logged-in", "true", {
+      httpOnly: false, // CRITICAL: Must be false for Navbar to read
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+      path: "/",
+    });
+
+    // 7. SET THE PUBLIC KYC STATUS COOKIE 📋
+    response.cookies.set("user-kyc-status", user.kycStatus || "NONE", {
+      httpOnly: false, // CRITICAL: Must be false for Navbar/Middleware
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+      path: "/",
+    });
 
     return response;
 

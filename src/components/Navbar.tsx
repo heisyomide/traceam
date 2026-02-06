@@ -28,20 +28,25 @@ export const Navbar = () => {
   }, []);
 
   // 2. Auth Logic: Check for the auth-token cookie specifically
+// 2. Auth Logic: Check for the PUBLIC cookie
   useEffect(() => {
-    const session = getCookie("auth-token");
-    // If the cookie exists, the user is considered authorized in the UI
-    setIsAuthorized(!!session);
+    const getCookie = (name: string) => {
+      if (typeof document === "undefined") return null;
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(";").shift();
+      return null;
+    };
+
+    const loggedIn = getCookie("is-logged-in");
+    setIsAuthorized(!!loggedIn);
   }, [pathname]);
 
   const handleLogout = () => {
-    // Clear all related cookies by setting expiration to the past
+    // Clear all cookies
     document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "is-logged-in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     document.cookie = "user-kyc-status=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = "admin-access=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    
-    // Also clear localStorage just in case of old data
-    localStorage.removeItem("terminal_access");
     
     setIsAuthorized(false);
     router.push("/");
