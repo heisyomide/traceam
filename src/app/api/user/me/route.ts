@@ -6,30 +6,32 @@ import User from "@/lib/models/user";
 
 export async function GET() {
   try {
+    // 1. Await cookies for Next.js 15 compatibility
     const cookieStore = await cookies();
-    let token = cookieStore.get("auth-token")?.value;
+    const rawToken = cookieStore.get("auth-token")?.value;
 
-    if (!token) {
+    if (!rawToken) {
       return NextResponse.json({ error: "NO_TOKEN" }, { status: 401 });
     }
 
-    // --- NEW IPHONE FIX START ---
-    // Safari sometimes wraps cookies in %22 (quotes) or literal double quotes
-    // We clean the string before passing it to the JWT verifier
-    const cleanToken = decodeURIComponent(token).replace(/^"|"$/g, '');
-    // --- NEW IPHONE FIX END ---
+    // 🛡️ IPHONE FIX: Clean the token string
+    // Safari sometimes wraps cookies in quotes or URL-encodes them
+    const token = decodeURIComponent(rawToken).replace(/^"|"$/g, '');
 
+    // 2. Security Check: Ensure Secret exists
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-      console.error("CRITICAL: JWT_SECRET missing");
+      console.error("CRITICAL: JWT_SECRET is missing from environment variables.");
       return NextResponse.json({ error: "SERVER_CONFIG_ERROR" }, { status: 500 });
     }
 
     try {
-      // Use the cleanToken here instead of the raw token
-      const decoded = jwt.verify(cleanToken, secret) as { id: string; email: string };
+      // 3. Verify and Decode using the cleaned token
+      const decoded = jwt.verify(token, secret) as { id: string; email: string };
       
       await connectToDatabase();
+
+      // 4. Fetch the most recent user data
       const user = await User.findById(decoded.id).select("-password");
 
       if (!user) {
@@ -39,8 +41,9 @@ export async function GET() {
       return NextResponse.json(user);
 
     } catch (jwtErr: any) {
-      // If it still fails, this log will now tell us exactly what the iPhone sent
-      console.error("DEBUG: JWT Verification failed:", jwtErr.message, "Cleaned Token Sample:", cleanToken.substring(0, 15));
+      // Enhanced logging to see exactly what the iPhone is sending if it still fails
+      console.error("DEBUG: JWT Verification failed:", jwtErr.message);
+      console.error("TOKEN SAMPLE:", token.substring(0, 20) + "...");
       
       const errorMessage = jwtErr.name === "TokenExpiredError" 
         ? "AUTH_SESSION_EXPIRED" 

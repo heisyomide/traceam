@@ -49,29 +49,30 @@ export default function PinLoginPage() {
 
       const result = await response.json();
 
-      if (response.ok && result.success) {
-        // --- KYC GATEKEEPER LOGIC ---
-        const kycStatus = result.user.kycStatus; // Expected: "PENDING", "APPROVED", or "NONE"
+if (response.ok && result.success) {
+  // 1. REMOVE the manual document.cookie for auth-token. 
+  // The server already sent it in the response header!
 
-        // 1. Set the Identity Cookie for the Middleware
-        document.cookie = `auth-token=${result.token}; path=/; max-age=86400; SameSite=Strict`;
-        
-        // 2. Set the KYC Status Cookie so Middleware knows where to send them
-        document.cookie = `user-kyc-status=${kycStatus}; path=/; max-age=86400; SameSite=Strict`;
+  // 2. Set only non-sensitive data if absolutely necessary, 
+  // but use 'Lax' to ensure iPhone compatibility.
+  const kycStatus = result.user.kycStatus;
+  document.cookie = `user-kyc-status=${kycStatus}; path=/; max-age=86400; SameSite=Lax; Secure`;
 
-        // 3. Routing Switch
-        if (kycStatus === "APPROVED") {
-          router.push("/dashboard");
-        } else if (kycStatus === "PENDING") {
-          router.push("/review");
-        } else {
-          // If status is "NONE" or "REJECTED"
-          router.push("/kyc");
-        }
+  // 3. THE IPHONE DELAY: Give the browser 100ms to process 
+  // the Set-Cookie header from the server before moving.
+  setTimeout(() => {
+    if (kycStatus === "APPROVED") {
+      router.push("/dashboard");
+    } else if (kycStatus === "PENDING") {
+      router.push("/review");
+    } else {
+      router.push("/kyc");
+    }
+  }, 100);
 
-      } else {
-        throw new Error("INVALID_SEQUENCE");
-      }
+} else {
+  throw new Error("INVALID_SEQUENCE");
+}
     } catch (err) {
       setStatus("error");
       setPin(["", "", "", "", ""]);
