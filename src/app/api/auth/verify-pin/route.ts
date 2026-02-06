@@ -67,7 +67,7 @@ response.cookies.set("auth-token", token, {
   
   maxAge: 60 * 60 * 24, // 24 hours
   path: "/",
-  
+  domain: "traceam.vercel.app",
   // If you have a custom domain (e.g., app.traceam.com), 
   // you can specify it here, but leaving it out works for .vercel.app
 });
