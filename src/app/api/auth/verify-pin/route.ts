@@ -26,13 +26,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. GENERATE REAL JWT 🛰️
-    // Use the secret from your .env file
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: "24h" }
-    );
+ // 3. GENERATE REAL JWT 🛰️
+const secret = process.env.JWT_SECRET;
+
+if (!secret) {
+  console.error("CRITICAL: JWT_SECRET is not defined in environment variables.");
+  return NextResponse.json(
+    { success: false, error: "SERVER_CONFIGURATION_ERROR" },
+    { status: 500 }
+  );
+}
+
+const token = jwt.sign(
+  { id: user._id, email: user.email },
+  secret,
+  { expiresIn: "24h" }
+);
 
     // 4. PREPARE SECURE RESPONSE
     const response = NextResponse.json({ 
