@@ -10,6 +10,15 @@ export const Navbar = () => {
   const [time, setTime] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
 
+  // Helper to read cookies on the client side
+  const getCookie = (name: string) => {
+    if (typeof document === "undefined") return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(";").shift();
+    return null;
+  };
+
   // 1. Clock Logic
   useEffect(() => {
     const timer = setInterval(() => {
@@ -18,16 +27,22 @@ export const Navbar = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // 2. Auth Logic: Check if session exists
+  // 2. Auth Logic: Check for the auth-token cookie specifically
   useEffect(() => {
-    const session = localStorage.getItem("terminal_access");
+    const session = getCookie("auth-token");
+    // If the cookie exists, the user is considered authorized in the UI
     setIsAuthorized(!!session);
   }, [pathname]);
 
   const handleLogout = () => {
+    // Clear all related cookies by setting expiration to the past
+    document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "user-kyc-status=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "admin-access=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    
+    // Also clear localStorage just in case of old data
     localStorage.removeItem("terminal_access");
-    // Clear cookie for middleware protection
-    document.cookie = "terminal_access=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    
     setIsAuthorized(false);
     router.push("/");
   };
@@ -78,7 +93,6 @@ export const Navbar = () => {
           </div>
 
           {isAuthorized ? (
-            /* --- AUTHORIZED STATE --- */
             <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4">
               <Link 
                 href="/dashboard"
@@ -100,7 +114,6 @@ export const Navbar = () => {
               </button>
             </div>
           ) : (
-            /* --- UNAUTHORIZED STATE --- */
             <button 
               onClick={() => router.push("/auth/login")}
               className="relative group flex items-center gap-2 bg-cyan-600 px-5 py-2 rounded-full overflow-hidden transition-all hover:pr-8 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.2)]"
