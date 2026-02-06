@@ -63,7 +63,7 @@ response.cookies.set("auth-token", token, {
   
   // 'strict' is safer for banking/security apps, 
   // but 'lax' is better if you have external links pointing to the dashboard.
-  sameSite: "strict", 
+  sameSite: "lax", 
   
   maxAge: 60 * 60 * 24, // 24 hours
   path: "/",
