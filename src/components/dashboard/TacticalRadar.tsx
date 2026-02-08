@@ -71,45 +71,54 @@ export default function TacticalRadar({
   }, [sos.countdown]);
 
   // --- Tracking & Telemetry Engine ---
-  const startTracking = () => {
-    if (!navigator.geolocation) return addLog("GPS_NOT_SUPPORTED");
-    if (watchId.current !== null) return; // Prevent multiple watchers
+// TacticalRadar.tsx - Updated startTracking Function
 
-    addLog("SEARCHING_SATELLITES...");
+const startTracking = () => {
+  if (!navigator.geolocation) return addLog("GPS_NOT_SUPPORTED");
+  if (watchId.current !== null) return; 
 
-    watchId.current = window.navigator.geolocation.watchPosition(
-      async (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(coords);
+  addLog("SEARCHING_SATELLITES...");
+
+  // 🛰️ RECOVER INCIDENT ON REFRESH
+  if (userData?.activeIncidentId && !incidentId.current) {
+    incidentId.current = userData.activeIncidentId;
+    addLog("RE-ESTABLISHING_INCIDENT_UPLINK...");
+  }
+
+  watchId.current = window.navigator.geolocation.watchPosition(
+    async (pos) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(coords);
+      
+      try {
+        const isNewIncident = !incidentId.current;
+        const endpoint = isNewIncident ? "/api/sos/start" : "/api/sos/update";
         
-        try {
-          // If we have an incidentId, use UPDATE. If not, use START.
-          const endpoint = incidentId.current ? "/api/sos/update" : "/api/sos/start";
-          
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              incidentId: incidentId.current,
-              coordinates: coords,
-            })
-          });
-          
-          const data = await res.json();
-          
-          if (data.success && !incidentId.current) {
-            incidentId.current = data.incidentId;
-            addLog("INCIDENT_LOGGED_IN_GRID");
-            addLog(`CONTACTS_NOTIFIED: ${data.contactsNotified || 0}`);
-          }
-        } catch (err) {
-          addLog("TELEMETRY_SYNC_FAILED");
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            incidentId: incidentId.current,
+            coordinates: coords,
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success && isNewIncident) {
+          // 🏆 THIS UPDATES THE LOG IN THE IMAGE
+          incidentId.current = data.incidentId;
+          addLog("INCIDENT_LOGGED_IN_GRID");
+          addLog(`CONTACTS_NOTIFIED: ${data.contactsNotified}`); 
         }
-      },
-      () => addLog("GPS_SIGNAL_LOST"),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
+      } catch (err) {
+        addLog("TELEMETRY_SYNC_FAILED");
+      }
+    },
+    () => addLog("GPS_SIGNAL_LOST"),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+};
 
   const stopSOS = async () => {
     // Clear local watcher
