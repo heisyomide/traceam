@@ -24,6 +24,17 @@ export default function TacticalRadar({
   
   const watchId = useRef<number | null>(null);
   const incidentId = useRef<string | null>(null);
+  const isInitialMount = useRef(true);
+
+  // --- SOS Persistence Logic (The Refresh Fix) ---
+  useEffect(() => {
+    if (userData?.sosActive && !sos.active && isInitialMount.current) {
+      addLog("RESTORING_ACTIVE_UPLINK...");
+      setSos({ active: true, countdown: null });
+      startTracking();
+      isInitialMount.current = false;
+    }
+  }, [userData]);
 
   // --- SOS Gatekeeper ---
   const handleSOSRequest = () => {
@@ -32,7 +43,6 @@ export default function TacticalRadar({
       return;
     }
 
-    // Checking kycStatus set by Admin Terminal
     const isVerified = userData.kycStatus === "APPROVED";
 
     if (!isVerified) {
@@ -63,6 +73,7 @@ export default function TacticalRadar({
   // --- Tracking & Telemetry Engine ---
   const startTracking = () => {
     if (!navigator.geolocation) return addLog("GPS_NOT_SUPPORTED");
+    if (watchId.current !== null) return; // Prevent multiple watchers
 
     addLog("SEARCHING_SATELLITES...");
 
@@ -72,7 +83,7 @@ export default function TacticalRadar({
         setLocation(coords);
         
         try {
-          // If we have an incidentId, use UPDATE (Heartbeat). If not, use START.
+          // If we have an incidentId, use UPDATE. If not, use START.
           const endpoint = incidentId.current ? "/api/sos/update" : "/api/sos/start";
           
           const res = await fetch(endpoint, {
@@ -101,7 +112,11 @@ export default function TacticalRadar({
   };
 
   const stopSOS = async () => {
-    if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+    // Clear local watcher
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
     
     try {
       const res = await fetch("/api/sos/stop", {
@@ -112,13 +127,13 @@ export default function TacticalRadar({
       
       if (res.ok) {
         addLog("EMERGENCY_CLOSED: STATUS_RESOLVED");
+        setSos({ active: false, countdown: null });
+        incidentId.current = null;
+        setLocation(null);
       }
     } catch { 
       addLog("STOP_PROTOCOL_FAILURE"); 
     }
-    
-    setSos({ active: false, countdown: null });
-    incidentId.current = null;
   };
 
   return (
